@@ -1,0 +1,978 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Swarm Maze Game</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root{
+      --bg: #f0f0ef;
+      --grain-opacity: 0.035;
+      --particle-color: 60, 60, 60;
+      --mag-off: 165,163,158;
+      --mag-on: 30,100,255;
+      --wall-stroke: rgba(0,0,0,0.3);
+      --wall-fill: rgba(0,0,0,0.05);
+      --obj-stroke: rgba(200,60,40,0.5);
+      --obj-fill: rgba(200,60,40,0.08);
+      --obj-text: rgba(0,0,0,0.45);
+      --hud-bg: rgba(255,255,255,0.55);
+      --hud-border: rgba(255,255,255,0.75);
+      --hud-text: rgba(0,0,0,0.8);
+      --hud-mute: rgba(0,0,0,0.45);
+      --hud-strong: rgba(0,0,0,0.92);
+      --accent: #1a6fb5;
+      --accent-rgb: 26,111,181;
+      --exit-rgb: 40,180,80;
+      --start-rgb: 30,100,255;
+      --btn-bg: rgba(0,0,0,0.06);
+      --btn-border: rgba(0,0,0,0.15);
+      --btn-text: rgba(0,0,0,0.5);
+      --btn-active-bg: rgba(26,111,181,0.15);
+      --btn-active-border: rgba(26,111,181,0.5);
+      --btn-active-text: rgba(0,0,0,0.85);
+    }
+
+    [data-theme="dark"]{
+      --bg: #0a0a0a;
+      --particle-color: 160, 160, 160;
+      --mag-off: 55,55,60;
+      --mag-on: 80,200,255;
+      --wall-stroke: rgba(255,255,255,0.35);
+      --wall-fill: rgba(255,255,255,0.06);
+      --obj-stroke: rgba(255,100,80,0.5);
+      --obj-fill: rgba(255,100,80,0.08);
+      --obj-text: rgba(255,255,255,0.5);
+      --hud-bg: rgba(18,18,18,0.7);
+      --hud-border: rgba(255,255,255,0.1);
+      --hud-text: rgba(255,255,255,0.82);
+      --hud-mute: rgba(255,255,255,0.5);
+      --hud-strong: rgba(255,255,255,0.92);
+      --accent: #66b6ff;
+      --accent-rgb: 80,200,255;
+      --exit-rgb: 80,255,120;
+      --start-rgb: 80,180,255;
+      --btn-bg: rgba(255,255,255,0.06);
+      --btn-border: rgba(255,255,255,0.15);
+      --btn-text: rgba(255,255,255,0.5);
+      --btn-active-bg: rgba(80,200,255,0.2);
+      --btn-active-border: rgba(80,200,255,0.5);
+      --btn-active-text: rgba(255,255,255,0.9);
+    }
+
+    html, body {
+      margin: 0; padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      transition: background 0.35s ease;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    body::before{
+      content:'';
+      position:fixed; inset:0;
+      pointer-events:none;
+      opacity: var(--grain-opacity);
+      z-index:2;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      background-size:180px 180px;
+    }
+
+    #game-canvas{
+      position:fixed; inset:0;
+      width:100vw; height:100vh;
+      z-index:1;
+      display:block;
+    }
+
+    /* Theme toggle */
+    .theme-toggle{
+      position:fixed; top:16px; right:80px; z-index:4;
+      display:flex; align-items:center; gap:8px;
+      background:none; border:none; padding:0; cursor:pointer; user-select:none;
+    }
+    .toggle-icon{ font-size:0.95rem; color:var(--hud-mute); }
+    .toggle-track{
+      width:40px; height:22px;
+      background:rgba(127,127,127,0.35);
+      border:1px solid rgba(255,255,255,0.10);
+      border-radius:11px; position:relative;
+      backdrop-filter:blur(10px);
+    }
+    .toggle-knob{
+      position:absolute; top:3px; left:3px;
+      width:16px; height:16px; border-radius:50%;
+      background:rgba(255,255,255,0.85);
+      transition:transform 0.25s ease, background 0.25s ease;
+      box-shadow:0 1px 3px rgba(0,0,0,0.25);
+    }
+    [data-theme="dark"] .toggle-knob{
+      transform:translateX(18px);
+      background:rgba(10,10,10,0.9);
+    }
+
+    .hud{
+      position:fixed;
+      top:16px; left:16px;
+      z-index:3;
+      padding:12px 16px;
+      border-radius:10px;
+      background: var(--hud-bg);
+      border: 1px solid var(--hud-border);
+      backdrop-filter: blur(14px);
+      color: var(--hud-text);
+      font-size:13px;
+      user-select:none;
+      min-width:230px;
+      transition: background 0.35s, border-color 0.35s, color 0.35s;
+    }
+    .hud h3{ margin:0 0 8px; font-size:14px; font-weight:600; color:var(--hud-strong); }
+    .hud-row{ display:flex; justify-content:space-between; align-items:center; margin:4px 0; }
+    .hud-val{ font-variant-numeric:tabular-nums; color:var(--accent); }
+
+    .rep-bar-wrap{ display:flex; align-items:center; gap:8px; margin:8px 0 4px; }
+    .rep-bar-label{ font-size:12px; color:var(--hud-mute); white-space:nowrap; }
+    .rep-bar-track{
+      flex:1; height:8px;
+      background: rgba(127,127,127,0.15);
+      border-radius:4px; position:relative; overflow:hidden;
+    }
+    .rep-bar-fill{
+      height:100%; border-radius:4px;
+      background: linear-gradient(90deg, rgba(80,200,255,0.6), rgba(255,120,80,0.8));
+      transition: width 0.05s;
+    }
+    .rep-bar-val{
+      font-size:12px; font-variant-numeric:tabular-nums;
+      color:var(--accent); min-width:32px; text-align:right;
+    }
+
+    .key-display{
+      margin-top:10px; padding-top:10px;
+      border-top:1px solid var(--hud-border);
+      display:flex; gap:16px; justify-content:center;
+    }
+    .key-group{ display:flex; flex-direction:column; align-items:center; gap:3px; }
+    .key-group-label{
+      font-size:9px; color:var(--hud-mute);
+      text-transform:uppercase; letter-spacing:1px; margin-bottom:2px;
+    }
+    .key-row{ display:flex; gap:3px; justify-content:center; }
+    .key-btn{
+      width:26px; height:26px; border-radius:4px;
+      background: var(--btn-bg);
+      border:1px solid var(--btn-border);
+      color: var(--btn-text);
+      font:600 11px/26px system-ui, sans-serif;
+      text-align:center;
+      transition: background 0.08s, border-color 0.08s, color 0.08s;
+    }
+    .key-btn.active{
+      background: var(--btn-active-bg);
+      border-color: var(--btn-active-border);
+      color: var(--btn-active-text);
+    }
+    .key-btn.active-r{
+      background: rgba(255,120,80,0.2);
+      border-color: rgba(255,120,80,0.5);
+      color: var(--btn-active-text);
+    }
+    .key-btn.active-e{
+      background: var(--btn-active-bg);
+      border-color: var(--btn-active-border);
+      color: var(--btn-active-text);
+    }
+
+    .back-link{
+      position:fixed; top:16px; right:16px; z-index:4;
+      padding:8px 16px; border-radius:8px;
+      background: var(--btn-bg);
+      border:1px solid var(--btn-border);
+      color: var(--hud-strong);
+      font:500 12px/1 system-ui, sans-serif;
+      text-decoration:none; transition: background 0.15s;
+    }
+    .back-link:hover{ background: rgba(127,127,127,0.2); }
+
+    .win-overlay{
+      display:none; position:fixed; inset:0; z-index:10;
+      background:rgba(0,0,0,0.7); backdrop-filter:blur(8px);
+      justify-content:center; align-items:center; flex-direction:column;
+      color:#fff; font-family:system-ui, sans-serif;
+    }
+    .win-overlay.show{ display:flex; }
+    .win-overlay h1{ font-size:48px; margin:0 0 10px; }
+    .win-overlay p{ font-size:18px; color:rgba(255,255,255,0.7); margin:0 0 24px; }
+    .win-overlay button{
+      padding:12px 32px; border:1px solid rgba(80,200,255,0.5); border-radius:8px;
+      background:rgba(80,200,255,0.15); color:#fff;
+      font:600 15px system-ui, sans-serif; cursor:pointer;
+    }
+    .win-overlay button:hover{ background:rgba(80,200,255,0.3); }
+  </style>
+</head>
+<body>
+
+  <!-- Theme toggle -->
+  <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+    <span class="toggle-icon" id="toggle-label"></span>
+    <div class="toggle-track"><div class="toggle-knob"></div></div>
+  </button>
+
+  <div class="hud">
+    <h3>Swarm Maze</h3>
+    <div class="hud-row"><span>Agents escaped</span><span class="hud-val" id="hEscaped">0 / 200</span></div>
+    <div class="hud-row"><span>Time</span><span class="hud-val" id="hTime">0:00</span></div>
+    <div class="rep-bar-wrap">
+      <span class="rep-bar-label">Repulsion</span>
+      <div class="rep-bar-track"><div class="rep-bar-fill" id="repFill" style="width:41%"></div></div>
+      <span class="rep-bar-val" id="repVal">0.50</span>
+    </div>
+    <div class="key-display">
+      <div class="key-group">
+        <span class="key-group-label">Move</span>
+        <div class="key-row"><div class="key-btn" id="kW">W</div></div>
+        <div class="key-row">
+          <div class="key-btn" id="kA">A</div>
+          <div class="key-btn" id="kS">S</div>
+          <div class="key-btn" id="kD">D</div>
+        </div>
+      </div>
+      <div class="key-group">
+        <span class="key-group-label">Repulsion</span>
+        <div class="key-row">
+          <div class="key-btn" id="kR">R</div>
+          <div class="key-btn" id="kE">E</div>
+        </div>
+        <div style="display:flex;gap:3px;font-size:9px;color:var(--hud-mute);">
+          <span style="width:26px;text-align:center">-</span>
+          <span style="width:26px;text-align:center">+</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <a href="index.html" class="back-link">Back</a>
+
+  <div class="win-overlay" id="winOverlay">
+    <h1>Escaped!</h1>
+    <p id="winMsg">All agents escaped in 0:00</p>
+    <button onclick="restartGame()">Play Again</button>
+  </div>
+
+  <canvas id="game-canvas"></canvas>
+
+  <script>
+    /* ===== Theme ===== */
+    const html = document.documentElement;
+    const tlabel = document.getElementById('toggle-label');
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const initTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+    html.setAttribute('data-theme', initTheme);
+    tlabel.textContent = initTheme === 'dark' ? '\u{1F319}' : '\u{2600}\u{FE0F}';
+
+    function toggleTheme(){
+      const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      tlabel.textContent = next === 'dark' ? '\u{1F319}' : '\u{2600}\u{FE0F}';
+      localStorage.setItem('theme', next);
+      colorCache = null;
+    }
+
+    /* ===== Canvas ===== */
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+
+    const AGENT_COUNT = 200;
+    const AGENT_R = 3;
+    const ATT_DIST = 50;
+    const ATT_F = 0.014;
+    const MAX_SPD = 4;
+    const DAMP = 0.96;
+    const WIN_THRESHOLD = 180;
+    const MAZE_SCALE = 0.64;
+
+    // Cursor attraction
+    const CURSOR_RANGE = 200;
+    const CURSOR_FORCE = 0.25;
+
+    // Electromagnet grid
+    const MAG_SX = 88;
+    const MAG_SY = 68;
+    const MAG_R = 20;
+    const DETECT_R = 62;
+    const DETECT_R2 = DETECT_R * DETECT_R;
+    const DENSITY_MAX = 14;
+    const DENSITY_THRESHOLD = 5;
+
+    let SEP_F = 0.5;
+    let MIN_GAP = AGENT_R * 12;
+    let MIN_DIST = AGENT_R * 2 + MIN_GAP;
+    let SEP_DIST = MIN_DIST;
+
+    let W, H;
+    let particles = [];
+    let walls = [];
+    let mazeObjects = []; // physics objects
+    let magnets = [];
+    let keys = {};
+    let escaped = 0;
+    let gameTime = 0;
+    let gameWon = false;
+    let lastTime = 0;
+    let exitZone = null;
+    let startZone = null;
+
+    // Cursor snaps to magnet grid centers
+    let cursorGridCol = 0, cursorGridRow = 0;
+    let cursorX = 0, cursorY = 0;
+
+    // Maze bounds (for magnet grid clipping)
+    let mazeLeft, mazeTop, mazeRight, mazeBottom;
+
+    // Object physics constants
+    const OBJ_DAMP = 0.94;
+    const OBJ_FRICTION = 0.3;
+
+    /* ===== Theme-aware colors ===== */
+    let colorCache = null, lastTheme = '';
+    function getColors(){
+      const theme = html.getAttribute('data-theme');
+      if (theme === lastTheme && colorCache) return colorCache;
+      lastTheme = theme;
+      const s = getComputedStyle(html);
+      colorCache = {
+        particle: s.getPropertyValue('--particle-color').trim(),
+        magOff: s.getPropertyValue('--mag-off').trim(),
+        magOn: s.getPropertyValue('--mag-on').trim(),
+        wallStroke: s.getPropertyValue('--wall-stroke').trim(),
+        wallFill: s.getPropertyValue('--wall-fill').trim(),
+        objStroke: s.getPropertyValue('--obj-stroke').trim(),
+        objFill: s.getPropertyValue('--obj-fill').trim(),
+        objText: s.getPropertyValue('--obj-text').trim(),
+        accentRgb: s.getPropertyValue('--accent-rgb').trim(),
+        exitRgb: s.getPropertyValue('--exit-rgb').trim(),
+        startRgb: s.getPropertyValue('--start-rgb').trim(),
+      };
+      return colorCache;
+    }
+
+    /* ===== Resize ===== */
+    function resize(){
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      W = Math.floor(window.innerWidth);
+      H = Math.floor(window.innerHeight);
+      canvas.width = Math.floor(W * dpr);
+      canvas.height = Math.floor(H * dpr);
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener('resize', () => { resize(); buildMaze(); buildMagnets(); resetParticles(); });
+    resize();
+
+    /* ===== Magnet grid ===== */
+    function buildMagnets(){
+      magnets = [];
+      const cols = Math.ceil(W / MAG_SX) + 2;
+      const rows = Math.ceil(H / MAG_SY) + 2;
+      for (let row = -1; row <= rows; row++){
+        const offset = (((row % 2) + 2) % 2 === 1) ? MAG_SX / 2 : 0;
+        for (let col = -1; col <= cols; col++){
+          magnets.push({ x: col * MAG_SX + offset, y: row * MAG_SY, brightness: 0, _c: 0 });
+        }
+      }
+    }
+
+    // Find nearest magnet grid position
+    function nearestMagnet(x, y){
+      let best = null, bestD = Infinity;
+      for (const m of magnets){
+        const dx = m.x - x, dy = m.y - y;
+        const d = dx*dx + dy*dy;
+        if (d < bestD){ bestD = d; best = m; }
+      }
+      return best;
+    }
+
+    function magGridNeighbor(fromX, fromY, dirX, dirY){
+      // Find nearest magnet strictly in the cardinal direction
+      // Use angle cone: must be within 50 degrees of desired direction
+      const cosThresh = Math.cos(50 * Math.PI / 180); // ~0.64
+      let best = null, bestD = Infinity;
+      for (const m of magnets){
+        const dx = m.x - fromX, dy = m.y - fromY;
+        const d2 = dx*dx + dy*dy;
+        if (d2 < 25) continue; // skip self / too close
+        const d = Math.sqrt(d2);
+        // Cosine of angle between movement direction and magnet direction
+        const cos = (dx*dirX + dy*dirY) / d;
+        if (cos < cosThresh) continue;
+        if (d2 < bestD){ bestD = d2; best = m; }
+      }
+      return best;
+    }
+
+    /* ===== Maze ===== */
+    function buildMaze(){
+      walls = [];
+      mazeObjects = [];
+
+      const cxScreen = W / 2, cyScreen = H / 2;
+      const fullW = W - 80, fullH = H - 80;
+      const mW = fullW * MAZE_SCALE;
+      const mH = fullH * MAZE_SCALE;
+      const mLeft_ = cxScreen - mW / 2;
+      const mTop_ = cyScreen - mH / 2;
+      const mRight_ = mLeft_ + mW;
+      const mBottom_ = mTop_ + mH;
+
+      mazeLeft = mLeft_;
+      mazeTop = mTop_;
+      mazeRight = mRight_;
+      mazeBottom = mBottom_;
+
+      const wallT = 12;
+      const gateH = Math.min(100, mH * 0.2);
+      const entryY = mTop_ + mH * 0.3;
+      const exitY = mTop_ + mH * 0.5;
+
+      startZone = { x: mLeft_, y: entryY, w: 60, h: gateH };
+      exitZone = { x: mRight_ - 10, y: exitY, w: 60, h: gateH };
+
+      // Outer walls
+      walls.push({ x: mLeft_, y: mTop_, w: mW, h: wallT }); // top
+      walls.push({ x: mLeft_, y: mBottom_ - wallT, w: mW, h: wallT }); // bottom
+
+      // Left with entry gap
+      walls.push({ x: mLeft_, y: mTop_, w: wallT, h: entryY - mTop_ });
+      walls.push({ x: mLeft_, y: entryY + gateH, w: wallT, h: mBottom_ - (entryY + gateH) });
+
+      // Right with exit gap
+      walls.push({ x: mRight_ - wallT, y: mTop_, w: wallT, h: exitY - mTop_ });
+      walls.push({ x: mRight_ - wallT, y: exitY + gateH, w: wallT, h: mBottom_ - (exitY + gateH) });
+
+      // Internal walls
+      const col1 = mLeft_ + mW * 0.22;
+      const col2 = mLeft_ + mW * 0.44;
+      const col3 = mLeft_ + mW * 0.66;
+      const midY = mTop_ + mH * 0.5;
+
+      walls.push({ x: col1, y: mTop_ + wallT, w: wallT, h: mH * 0.55 });
+      walls.push({ x: col2, y: mTop_ + mH * 0.35, w: wallT, h: mH * 0.65 - wallT });
+      walls.push({ x: col3, y: mTop_ + wallT, w: wallT, h: mH * 0.5 });
+      walls.push({ x: col1 + wallT, y: midY - wallT / 2, w: (col2 - col1) * 0.5, h: wallT });
+      walls.push({ x: col2 + wallT, y: mTop_ + mH * 0.25, w: (col3 - col2) * 0.6, h: wallT });
+
+      // Physics objects (bigger, with mass)
+      const objR = 38;
+      const objMass = 50;
+      function mkObj(x, y, r){
+        return { x, y, r, vx: 0, vy: 0, mass: objMass };
+      }
+      mazeObjects.push(mkObj((mLeft_ + col1) / 2, mTop_ + mH * 0.7, objR));
+      mazeObjects.push(mkObj((col1 + col2) / 2, mTop_ + mH * 0.2, objR + 10));
+      mazeObjects.push(mkObj((col2 + col3) / 2, mTop_ + mH * 0.6, objR + 5));
+      mazeObjects.push(mkObj(col3 + (mRight_ - col3) * 0.5, mTop_ + mH * 0.35, objR + 8));
+      mazeObjects.push(mkObj((mLeft_ + col1) / 2, mTop_ + mH * 0.35, objR - 6));
+    }
+
+    /* ===== Particles ===== */
+    function resetParticles(){
+      particles = [];
+      escaped = 0;
+      gameWon = false;
+      gameTime = 0;
+      lastTime = performance.now();
+      document.getElementById('winOverlay').classList.remove('show');
+
+      const spawnCx = startZone.x + 80;
+      const spawnCy = startZone.y + startZone.h / 2;
+      const spawnRadius = 55;
+
+      // Snap cursor to nearest magnet at spawn
+      const startMag = nearestMagnet(spawnCx, spawnCy);
+      cursorX = startMag ? startMag.x : spawnCx;
+      cursorY = startMag ? startMag.y : spawnCy;
+
+      for (let i = 0; i < AGENT_COUNT; i++){
+        const angle = Math.random() * Math.PI * 2;
+        const r = Math.sqrt(Math.random()) * spawnRadius;
+        particles.push({
+          x: spawnCx + Math.cos(angle) * r,
+          y: spawnCy + Math.sin(angle) * r,
+          vx: (Math.random() - 0.5) * 0.5,
+          vy: (Math.random() - 0.5) * 0.5,
+          phase: Math.random() * Math.PI * 2,
+          r: AGENT_R,
+          escaped: false
+        });
+      }
+
+      for (let iter = 0; iter < 10; iter++){
+        for (const p of particles){
+          resolveWallCollision(p);
+          resolveObjCollisionParticle(p);
+        }
+      }
+    }
+
+    /* ===== Collisions ===== */
+    function resolveWallCollision(p){
+      for (const w of walls){
+        const closestX = Math.max(w.x, Math.min(w.x + w.w, p.x));
+        const closestY = Math.max(w.y, Math.min(w.y + w.h, p.y));
+        const dx = p.x - closestX, dy = p.y - closestY;
+        const dist2 = dx*dx + dy*dy;
+        const minD = p.r + 2;
+        if (dist2 < minD * minD){
+          const dist = Math.sqrt(dist2) || 0.01;
+          const nx = dx/dist, ny = dy/dist;
+          p.x += nx * (minD - dist);
+          p.y += ny * (minD - dist);
+          const dot = p.vx*nx + p.vy*ny;
+          if (dot < 0){ p.vx -= dot*nx; p.vy -= dot*ny; }
+        }
+      }
+    }
+
+    function resolveWallCollisionObj(obj){
+      for (const w of walls){
+        const closestX = Math.max(w.x, Math.min(w.x + w.w, obj.x));
+        const closestY = Math.max(w.y, Math.min(w.y + w.h, obj.y));
+        const dx = obj.x - closestX, dy = obj.y - closestY;
+        const dist2 = dx*dx + dy*dy;
+        const minD = obj.r + 2;
+        if (dist2 < minD * minD){
+          const dist = Math.sqrt(dist2) || 0.01;
+          const nx = dx/dist, ny = dy/dist;
+          obj.x += nx * (minD - dist);
+          obj.y += ny * (minD - dist);
+          const dot = obj.vx*nx + obj.vy*ny;
+          if (dot < 0){ obj.vx -= dot*nx*1.2; obj.vy -= dot*ny*1.2; }
+        }
+      }
+    }
+
+    function resolveObjCollisionParticle(p){
+      for (const obj of mazeObjects){
+        const dx = p.x - obj.x, dy = p.y - obj.y;
+        const dist = Math.sqrt(dx*dx + dy*dy) || 0.01;
+        const minD = p.r + obj.r + 2;
+        if (dist < minD){
+          const nx = dx/dist, ny = dy/dist;
+          const overlap = minD - dist;
+          // Push particle mostly, object slightly
+          p.x += nx * overlap * 0.8;
+          p.y += ny * overlap * 0.8;
+          obj.x -= nx * overlap * 0.2;
+          obj.y -= ny * overlap * 0.2;
+
+          // Impulse exchange
+          const relVx = p.vx - obj.vx, relVy = p.vy - obj.vy;
+          const relVn = relVx*nx + relVy*ny;
+          if (relVn < 0){
+            const pMass = 0.5;
+            const j = -(1.3) * relVn / (1/pMass + 1/obj.mass);
+            p.vx += (j/pMass) * nx;
+            p.vy += (j/pMass) * ny;
+            obj.vx -= (j/obj.mass) * nx;
+            obj.vy -= (j/obj.mass) * ny;
+          }
+        }
+      }
+    }
+
+    function resolveObjObjCollision(){
+      for (let i = 0; i < mazeObjects.length; i++){
+        for (let j = i+1; j < mazeObjects.length; j++){
+          const a = mazeObjects[i], b = mazeObjects[j];
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const dist = Math.sqrt(dx*dx + dy*dy) || 0.01;
+          const minD = a.r + b.r + 2;
+          if (dist < minD){
+            const nx = dx/dist, ny = dy/dist;
+            const overlap = minD - dist;
+            a.x -= nx * overlap * 0.5;
+            a.y -= ny * overlap * 0.5;
+            b.x += nx * overlap * 0.5;
+            b.y += ny * overlap * 0.5;
+            const relV = (a.vx-b.vx)*nx + (a.vy-b.vy)*ny;
+            if (relV > 0){
+              a.vx -= relV*nx*0.5; a.vy -= relV*ny*0.5;
+              b.vx += relV*nx*0.5; b.vy += relV*ny*0.5;
+            }
+          }
+        }
+      }
+    }
+
+    /* ===== Input ===== */
+    const codeMap = {
+      'KeyW':'w','KeyA':'a','KeyS':'s','KeyD':'d',
+      'KeyE':'e','KeyR':'r'
+    };
+    window.addEventListener('keydown', e => {
+      const k = codeMap[e.code];
+      if (k){
+        if (!keys[k]){
+          keys[k] = true;
+          // Discrete cursor movement on key press
+          if (k === 'w' || k === 'a' || k === 's' || k === 'd'){
+            moveCursor(k);
+          }
+        }
+        e.preventDefault();
+      }
+    });
+    window.addEventListener('keyup', e => {
+      const k = codeMap[e.code];
+      if (k) keys[k] = false;
+    });
+
+    // Key repeat for held keys
+    let keyRepeatTimer = {};
+    let keyHeldSince = {};
+    function checkHeldKeys(){
+      const now = performance.now();
+      for (const k of ['w','a','s','d']){
+        if (keys[k]){
+          if (!keyHeldSince[k]) keyHeldSince[k] = now;
+          const held = now - keyHeldSince[k];
+          if (held > 300){ // after 300ms start repeating
+            if (!keyRepeatTimer[k] || now - keyRepeatTimer[k] > 120){
+              moveCursor(k);
+              keyRepeatTimer[k] = now;
+            }
+          }
+        } else {
+          keyHeldSince[k] = 0;
+          keyRepeatTimer[k] = 0;
+        }
+      }
+    }
+
+    function moveCursor(dir){
+      // Pure cardinal: W=up, S=down, A=left, D=right
+      const dirMap = { w:[0,-1], s:[0,1], a:[-1,0], d:[1,0] };
+      const [dx, dy] = dirMap[dir];
+      const target = magGridNeighbor(cursorX, cursorY, dx, dy);
+      if (target){
+        cursorX = target.x;
+        cursorY = target.y;
+      }
+    }
+
+    /* ===== HUD key highlight ===== */
+    const keyEls = {
+      w: document.getElementById('kW'),
+      a: document.getElementById('kA'),
+      s: document.getElementById('kS'),
+      d: document.getElementById('kD'),
+      e: document.getElementById('kE'),
+      r: document.getElementById('kR'),
+    };
+    function updateKeyDisplay(){
+      for (const [k, el] of Object.entries(keyEls)){
+        if (k === 'e') el.classList.toggle('active-e', !!keys[k]);
+        else if (k === 'r') el.classList.toggle('active-r', !!keys[k]);
+        else el.classList.toggle('active', !!keys[k]);
+      }
+    }
+
+    /* ===== Update ===== */
+    function update(){
+      if (gameWon) return;
+
+      const now = performance.now();
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+      gameTime += dt;
+
+      // Repulsion control (continuous while held)
+      if (keys['e']) SEP_F = Math.min(1.0, SEP_F + 0.005);
+      if (keys['r']) SEP_F = Math.max(0.15, SEP_F - 0.005);
+
+      // Held WASD repeat
+      checkHeldKeys();
+
+      // Particle physics
+      for (let i = 0; i < particles.length; i++){
+        const p = particles[i];
+        if (p.escaped) continue;
+
+        // Cursor attraction
+        const mdx = cursorX - p.x, mdy = cursorY - p.y;
+        const md = Math.sqrt(mdx*mdx + mdy*mdy);
+        if (md < CURSOR_RANGE && md > 1){
+          const f = CURSOR_FORCE * (1 - md / CURSOR_RANGE);
+          p.vx += (mdx/md) * f;
+          p.vy += (mdy/md) * f;
+        }
+
+        // Swarmalator coupling
+        for (let j = i+1; j < particles.length; j++){
+          const q = particles[j];
+          if (q.escaped) continue;
+          const dx = q.x - p.x, dy = q.y - p.y;
+          const d = Math.sqrt(dx*dx + dy*dy);
+          if (d < 1 || d > ATT_DIST) continue;
+          const nx = dx/d, ny = dy/d;
+          if (d < SEP_DIST){
+            const f = SEP_F * (1 - d / SEP_DIST);
+            p.vx -= nx*f; p.vy -= ny*f;
+            q.vx += nx*f; q.vy += ny*f;
+          } else {
+            const sync = (1 + Math.cos(q.phase - p.phase)) * 0.5;
+            const f = ATT_F * sync;
+            p.vx += nx*f; p.vy += ny*f;
+            q.vx -= nx*f; q.vy -= ny*f;
+            const dp = 0.0008 * Math.sin(q.phase - p.phase);
+            p.phase += dp; q.phase -= dp;
+          }
+        }
+
+        p.vx *= DAMP; p.vy *= DAMP;
+        const spd = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
+        if (spd > MAX_SPD){ p.vx = (p.vx/spd)*MAX_SPD; p.vy = (p.vy/spd)*MAX_SPD; }
+
+        p.x += p.vx; p.y += p.vy;
+
+        resolveWallCollision(p);
+        resolveObjCollisionParticle(p);
+
+        // Screen bounds
+        if (p.x < p.r){ p.x = p.r; p.vx *= -0.5; }
+        if (p.y < p.r){ p.y = p.r; p.vy *= -0.5; }
+        if (p.y > H - p.r){ p.y = H - p.r; p.vy *= -0.5; }
+
+        // Exit
+        if (p.x > exitZone.x && p.y > exitZone.y && p.y < exitZone.y + exitZone.h){
+          if (p.x > W - 20){ p.escaped = true; escaped++; }
+        } else {
+          if (p.x > W - p.r){ p.x = W - p.r; p.vx *= -0.5; }
+        }
+      }
+
+      // Object physics
+      for (const obj of mazeObjects){
+        obj.vx *= OBJ_DAMP; obj.vy *= OBJ_DAMP;
+        const spd = Math.sqrt(obj.vx*obj.vx + obj.vy*obj.vy);
+        if (spd > 0.01){
+          const fric = Math.min(OBJ_FRICTION / obj.mass, spd);
+          obj.vx -= (obj.vx/spd)*fric; obj.vy -= (obj.vy/spd)*fric;
+        }
+        obj.x += obj.vx; obj.y += obj.vy;
+        resolveWallCollisionObj(obj);
+        // Keep in screen
+        obj.x = Math.max(obj.r, Math.min(W - obj.r, obj.x));
+        obj.y = Math.max(obj.r, Math.min(H - obj.r, obj.y));
+      }
+      resolveObjObjCollision();
+
+      // Win
+      if (escaped >= WIN_THRESHOLD){
+        gameWon = true;
+        const mins = Math.floor(gameTime / 60);
+        const secs = Math.floor(gameTime % 60);
+        document.getElementById('winMsg').textContent =
+          `${escaped} agents escaped in ${mins}:${secs.toString().padStart(2,'0')}`;
+        document.getElementById('winOverlay').classList.add('show');
+      }
+    }
+
+    /* ===== Draw ===== */
+    function drawZoneGlow(zone, rgbStr, label){
+      const isExit = label === 'EXIT';
+      const x0 = isExit ? zone.x - 30 : zone.x - zone.w;
+      const x1 = isExit ? zone.x + zone.w : zone.x + 30;
+      const grad = ctx.createLinearGradient(x0, 0, x1, 0);
+      if (isExit){
+        grad.addColorStop(0, `rgba(${rgbStr},0)`);
+        grad.addColorStop(0.5, `rgba(${rgbStr},0.08)`);
+        grad.addColorStop(1, `rgba(${rgbStr},0.18)`);
+      } else {
+        grad.addColorStop(0, `rgba(${rgbStr},0.18)`);
+        grad.addColorStop(0.5, `rgba(${rgbStr},0.08)`);
+        grad.addColorStop(1, `rgba(${rgbStr},0)`);
+      }
+      ctx.fillStyle = grad;
+      ctx.fillRect(x0, zone.y, x1-x0, zone.h);
+
+      const pulse = 0.4 + Math.sin(gameTime * 3) * 0.15;
+      ctx.strokeStyle = `rgba(${rgbStr},${pulse})`;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4,4]);
+      ctx.beginPath();
+      ctx.moveTo(zone.x, zone.y); ctx.lineTo(zone.x, zone.y + zone.h);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.font = '600 12px system-ui, sans-serif';
+      ctx.fillStyle = `rgba(${rgbStr},0.7)`;
+      ctx.textAlign = 'center';
+      ctx.fillText(label, isExit ? zone.x + zone.w/2 : zone.x, zone.y - 10);
+
+      ctx.strokeStyle = `rgba(${rgbStr},${pulse})`;
+      ctx.lineWidth = 2;
+      const arrowX = isExit ? zone.x + 20 : zone.x - 20;
+      const arrowY = zone.y + zone.h / 2;
+      ctx.beginPath();
+      if (isExit){
+        ctx.moveTo(arrowX, arrowY-8); ctx.lineTo(arrowX+10, arrowY); ctx.lineTo(arrowX, arrowY+8);
+      } else {
+        ctx.moveTo(arrowX, arrowY-8); ctx.lineTo(arrowX-10, arrowY); ctx.lineTo(arrowX, arrowY+8);
+      }
+      ctx.stroke();
+    }
+
+    function draw(){
+      ctx.clearRect(0, 0, W, H);
+      const C = getColors();
+
+      // 1) Magnet density from particles
+      for (let m = 0; m < magnets.length; m++) magnets[m]._c = 0;
+      for (let i = 0; i < particles.length; i++){
+        if (particles[i].escaped) continue;
+        const p = particles[i];
+        for (let m = 0; m < magnets.length; m++){
+          const mg = magnets[m];
+          const dx = p.x - mg.x, dy = p.y - mg.y;
+          if (dx*dx + dy*dy < DETECT_R2) mg._c++;
+        }
+      }
+
+      // 2) Draw electromagnets
+      for (let m = 0; m < magnets.length; m++){
+        const mg = magnets[m];
+        const densityRaw = Math.max(0, Math.min((mg._c - DENSITY_THRESHOLD) / (DENSITY_MAX - DENSITY_THRESHOLD), 1));
+        const target = Math.pow(densityRaw, 0.55);
+        mg.brightness += (target - mg.brightness) * 0.12;
+        const b = mg.brightness;
+
+        ctx.beginPath();
+        ctx.arc(mg.x, mg.y, MAG_R, 0, Math.PI*2);
+        ctx.strokeStyle = `rgba(${C.magOff},${0.10 + b*0.08})`;
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        if (b > 0.015){
+          const grad = ctx.createRadialGradient(mg.x, mg.y, 0, mg.x, mg.y, MAG_R*(1+b*0.6));
+          grad.addColorStop(0,    `rgba(${C.magOn},${b*0.92})`);
+          grad.addColorStop(0.45, `rgba(${C.magOn},${b*0.55})`);
+          grad.addColorStop(0.8,  `rgba(${C.magOn},${b*0.18})`);
+          grad.addColorStop(1,    `rgba(${C.magOn},0)`);
+          ctx.beginPath();
+          ctx.arc(mg.x, mg.y, MAG_R*(1+b*0.6), 0, Math.PI*2);
+          ctx.fillStyle = grad;
+          ctx.fill();
+        }
+      }
+
+      // Zone glows
+      if (startZone) drawZoneGlow(startZone, C.startRgb, 'START');
+      if (exitZone) drawZoneGlow(exitZone, C.exitRgb, 'EXIT');
+
+      // Walls
+      for (const w of walls){
+        ctx.fillStyle = C.wallFill;
+        ctx.fillRect(w.x, w.y, w.w, w.h);
+        ctx.strokeStyle = C.wallStroke;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(w.x, w.y, w.w, w.h);
+      }
+
+      // Objects (physics circles)
+      for (const obj of mazeObjects){
+        ctx.beginPath();
+        ctx.arc(obj.x, obj.y, obj.r, 0, Math.PI*2);
+        ctx.fillStyle = C.objFill;
+        ctx.fill();
+        ctx.strokeStyle = C.objStroke;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        // Mass label
+        ctx.fillStyle = C.objText;
+        ctx.font = '500 10px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`m=${obj.mass}`, obj.x, obj.y);
+      }
+
+      // Cursor
+      const cursorPulse = 0.15 + Math.sin(gameTime * 4) * 0.05;
+      ctx.beginPath();
+      ctx.arc(cursorX, cursorY, CURSOR_RANGE, 0, Math.PI*2);
+      ctx.strokeStyle = `rgba(${C.accentRgb},${cursorPulse*0.4})`;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6,6]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const cGrad = ctx.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, 30);
+      cGrad.addColorStop(0, `rgba(${C.accentRgb},0.25)`);
+      cGrad.addColorStop(0.5, `rgba(${C.accentRgb},0.08)`);
+      cGrad.addColorStop(1, `rgba(${C.accentRgb},0)`);
+      ctx.fillStyle = cGrad;
+      ctx.beginPath();
+      ctx.arc(cursorX, cursorY, 30, 0, Math.PI*2);
+      ctx.fill();
+
+      ctx.strokeStyle = `rgba(${C.accentRgb},0.6)`;
+      ctx.lineWidth = 1.5;
+      const ch = 8;
+      ctx.beginPath();
+      ctx.moveTo(cursorX-ch, cursorY); ctx.lineTo(cursorX+ch, cursorY);
+      ctx.moveTo(cursorX, cursorY-ch); ctx.lineTo(cursorX, cursorY+ch);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(cursorX, cursorY, 2.5, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(${C.accentRgb},0.8)`;
+      ctx.fill();
+
+      // Particles
+      for (const p of particles){
+        if (p.escaped) continue;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(${C.particle},0.65)`;
+        ctx.fill();
+      }
+
+      // HUD
+      document.getElementById('hEscaped').textContent = `${escaped} / ${AGENT_COUNT}`;
+      const mins = Math.floor(gameTime / 60);
+      const secs = Math.floor(gameTime % 60);
+      document.getElementById('hTime').textContent = `${mins}:${secs.toString().padStart(2,'0')}`;
+      const repPct = ((SEP_F - 0.15) / (1.0 - 0.15)) * 100;
+      document.getElementById('repFill').style.width = repPct + '%';
+      document.getElementById('repVal').textContent = SEP_F.toFixed(2);
+      updateKeyDisplay();
+    }
+
+    function gameLoop(){
+      update();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    function restartGame(){
+      SEP_F = 0.5;
+      buildMaze();
+      buildMagnets();
+      resetParticles();
+    }
+
+    // Init
+    buildMaze();
+    buildMagnets();
+    resetParticles();
+    gameLoop();
+  </script>
+</body>
+</html>

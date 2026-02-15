@@ -235,6 +235,22 @@
       color: var(--panel-text-strong);
       letter-spacing:0.2px;
     }
+
+    .game-link{
+      position:fixed;
+      bottom:20px; right:20px;
+      z-index:4;
+      padding:10px 20px;
+      border-radius:8px;
+      background: rgba(80,180,255,0.15);
+      border:1px solid rgba(80,180,255,0.4);
+      color: var(--panel-text-strong);
+      font:600 13px/1 system-ui, -apple-system, sans-serif;
+      text-decoration:none;
+      backdrop-filter: blur(10px);
+      transition: background 0.15s;
+    }
+    .game-link:hover{ background: rgba(80,180,255,0.30); }
   </style>
 </head>
 <body>
@@ -244,6 +260,9 @@
     <span class="toggle-icon" id="toggle-label">🌙</span>
     <div class="toggle-track"><div class="toggle-knob"></div></div>
   </button>
+
+  <!-- Game link -->
+  <a href="game.html" class="game-link">Swarm Maze Game</a>
 
   <div class="panel">
     <div style="text-align:center; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--panel-border);">
