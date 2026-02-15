@@ -160,6 +160,81 @@
       font-size:12px;
       transition: color 0.35s ease;
     }
+    .spawn-btn{
+      width:100%;
+      padding:7px 0;
+      margin-top:10px;
+      border:1px solid var(--panel-border);
+      border-radius:6px;
+      background: rgba(127,127,127,0.15);
+      color: var(--panel-text-strong);
+      font:500 12px/1 system-ui, -apple-system, sans-serif;
+      cursor:pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .spawn-btn:hover{ background: rgba(127,127,127,0.30); }
+    .remove-btn{
+      width:100%;
+      padding:7px 0;
+      margin-top:5px;
+      border:1px solid rgba(200,60,60,0.3);
+      border-radius:6px;
+      background: rgba(200,60,60,0.10);
+      color: var(--panel-text-strong);
+      font:500 12px/1 system-ui, -apple-system, sans-serif;
+      cursor:pointer;
+      transition: background 0.15s;
+    }
+    .remove-btn:hover{ background: rgba(200,60,60,0.25); }
+
+    .dance-section{
+      border-top:1px solid var(--panel-border);
+      padding-top:10px;
+      margin-top:12px;
+    }
+    .dance-row{
+      display:flex;
+      gap:6px;
+      margin-top:8px;
+    }
+    .dance-select{
+      flex:1;
+      padding:6px 8px;
+      border:1px solid var(--panel-border);
+      border-radius:6px;
+      background: rgba(127,127,127,0.15);
+      color: var(--panel-text-strong);
+      font:500 11px/1 system-ui, -apple-system, sans-serif;
+      cursor:pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23999' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+      padding-right: 24px;
+    }
+    .dance-btn{
+      padding:6px 16px;
+      border:1px solid rgba(80,180,255,0.4);
+      border-radius:6px;
+      background: rgba(80,180,255,0.12);
+      color: var(--panel-text-strong);
+      font:600 11px/1 system-ui, -apple-system, sans-serif;
+      cursor:pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    .dance-btn:hover{ background: rgba(80,180,255,0.25); }
+    .dance-btn.active{
+      background: rgba(80,180,255,0.35);
+      border-color: rgba(80,180,255,0.7);
+    }
+    .dance-label{
+      font-size:12px;
+      font-weight:600;
+      color: var(--panel-text-strong);
+      letter-spacing:0.2px;
+    }
   </style>
 </head>
 <body>
@@ -171,6 +246,11 @@
   </button>
 
   <div class="panel">
+    <div style="text-align:center; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--panel-border);">
+      <div style="font-size:15px; font-weight:600; letter-spacing:0.3px; color:var(--panel-text-strong);">Virtual Swarmalator</div>
+      <div style="font-size:11px; color:var(--panel-text-mute); margin-top:2px;">DH Han, SAM Lab</div>
+    </div>
+
     <h3>Controls</h3>
 
     <div class="row">
@@ -205,7 +285,45 @@
       <input id="sSep" type="range" min="0" max="3.0" step="0.01" value="0.15">
     </div>
 
-    <div class="hint">DH Han, SAM Lab</div>
+    <div style="border-top:1px solid var(--panel-border); padding-top:10px; margin-top:12px;">
+      <h3>Objects</h3>
+    </div>
+
+    <div class="row">
+      <div class="label"><span>object mass</span><span class="v" id="vMass"></span></div>
+      <input id="sMass" type="range" min="5" max="200" step="5" value="50">
+    </div>
+
+    <div class="row">
+      <div class="label"><span>object size</span><span class="v" id="vObjSize"></span></div>
+      <input id="sObjSize" type="range" min="30" max="150" step="5" value="60">
+    </div>
+
+    <button class="spawn-btn" id="btnSpawn">Spawn Object</button>
+    <button class="remove-btn" id="btnRemove">Remove All Objects</button>
+
+    <div class="dance-section">
+      <h3>Dance</h3>
+      <div class="row">
+        <div class="label"><span>field strength</span><span class="v" id="vDanceStr"></span></div>
+        <input id="sDanceStr" type="range" min="0.1" max="2.0" step="0.05" value="0.8">
+      </div>
+      <div class="row">
+        <div class="label"><span>tempo</span><span class="v" id="vDanceTempo"></span></div>
+        <input id="sDanceTempo" type="range" min="0.2" max="3.0" step="0.1" value="1.0">
+      </div>
+      <div class="dance-row">
+        <select class="dance-select" id="danceMode">
+          <option value="vortex">Vortex</option>
+          <option value="wave">Wave</option>
+          <option value="pulse">Pulse</option>
+          <option value="split">Split &amp; Merge</option>
+          <option value="figure8">Figure-8</option>
+        </select>
+        <button class="dance-btn" id="btnDance">Dance</button>
+      </div>
+    </div>
+
   </div>
 
   <canvas id="particle-canvas"></canvas>
@@ -257,6 +375,132 @@
     const GROUP_THRESHOLD = 18;
     const GROUP_MERGE_DIST = MAG_SX * 1.6;
     let magnets = [];
+
+    // --- Object params ---
+    const sMass    = document.getElementById('sMass');
+    const sObjSize = document.getElementById('sObjSize');
+    const vMass    = document.getElementById('vMass');
+    const vObjSize = document.getElementById('vObjSize');
+    let OBJ_MASS = parseInt(sMass.value, 10);
+    let OBJ_SIZE = parseInt(sObjSize.value, 10);
+    const OBJ_DAMP = 0.94;
+    const OBJ_ANG_DAMP = 0.92;
+    const OBJ_FRICTION = 0.3;
+
+    let objects = [];  // rigid body objects
+
+    function createObject(x, y) {
+      const w = OBJ_SIZE, h = OBJ_SIZE * 0.65;
+      const mass = OBJ_MASS;
+      // moment of inertia for rectangle: (1/12) * m * (w^2 + h^2)
+      const inertia = (mass / 12) * (w*w + h*h);
+      return { x, y, w, h, angle: 0, vx: 0, vy: 0, angVel: 0, mass, inertia };
+    }
+
+    document.getElementById('btnSpawn').addEventListener('click', () => {
+      // spawn at center with slight random offset
+      objects.push(createObject(
+        W/2 + (Math.random()-0.5)*100,
+        H/2 + (Math.random()-0.5)*100
+      ));
+    });
+    document.getElementById('btnRemove').addEventListener('click', () => { objects = []; });
+
+    sMass.addEventListener('input', () => { OBJ_MASS = parseInt(sMass.value, 10); updateLabels(); });
+    sObjSize.addEventListener('input', () => { OBJ_SIZE = parseInt(sObjSize.value, 10); updateLabels(); });
+
+    // --- Dance params ---
+    const btnDance    = document.getElementById('btnDance');
+    const danceSelect = document.getElementById('danceMode');
+    const sDanceStr   = document.getElementById('sDanceStr');
+    const sDanceTempo = document.getElementById('sDanceTempo');
+    const vDanceStr   = document.getElementById('vDanceStr');
+    const vDanceTempo = document.getElementById('vDanceTempo');
+
+    let danceActive = false;
+    let danceTime   = 0;
+    let DANCE_STRENGTH = parseFloat(sDanceStr.value);
+    let DANCE_TEMPO    = parseFloat(sDanceTempo.value);
+    const DANCE_MAG_RANGE = 120; // how far a dance-activated magnet attracts
+
+    sDanceStr.addEventListener('input', () => { DANCE_STRENGTH = parseFloat(sDanceStr.value); updateLabels(); });
+    sDanceTempo.addEventListener('input', () => { DANCE_TEMPO = parseFloat(sDanceTempo.value); updateLabels(); });
+
+    btnDance.addEventListener('click', () => {
+      danceActive = !danceActive;
+      btnDance.classList.toggle('active', danceActive);
+      btnDance.textContent = danceActive ? 'Stop' : 'Dance';
+      if (danceActive) danceTime = 0;
+    });
+
+    // Dance pattern functions: return activation 0-1 for a magnet at (mx, my) given time t
+    const dancePatterns = {
+      vortex(mx, my, t) {
+        // Rotating attractor point orbiting screen center
+        const cx = W/2, cy = H/2;
+        const orbitR = Math.min(W, H) * 0.25;
+        const ax = cx + Math.cos(t) * orbitR;
+        const ay = cy + Math.sin(t) * orbitR;
+        const dx = mx - ax, dy = my - ay;
+        const d = Math.sqrt(dx*dx + dy*dy);
+        return Math.max(0, 1 - d / (orbitR * 0.6));
+      },
+
+      wave(mx, my, t) {
+        // Traveling sine wave from left to right
+        const waveX = (t * W * 0.15) % (W * 1.4) - W * 0.2;
+        const band = W * 0.18;
+        const dist = Math.abs(mx - waveX);
+        if (dist > band) return 0;
+        // Vertical sine modulation
+        const sineY = H/2 + Math.sin(mx * 0.015 + t * 2) * H * 0.25;
+        const dy = Math.abs(my - sineY);
+        const yBand = H * 0.15;
+        if (dy > yBand) return 0;
+        return (1 - dist/band) * (1 - dy/yBand);
+      },
+
+      pulse(mx, my, t) {
+        // Expanding and contracting ring from center
+        const cx = W/2, cy = H/2;
+        const maxR = Math.min(W, H) * 0.38;
+        const ringR = ((Math.sin(t) + 1) / 2) * maxR;
+        const dx = mx - cx, dy = my - cy;
+        const d = Math.sqrt(dx*dx + dy*dy);
+        const ringWidth = 60;
+        const dist = Math.abs(d - ringR);
+        return dist < ringWidth ? (1 - dist/ringWidth) : 0;
+      },
+
+      split(mx, my, t) {
+        // Two attractors that orbit: split apart then merge
+        const cx = W/2, cy = H/2;
+        const sep = Math.sin(t * 0.7) * Math.min(W, H) * 0.3;
+        const a1x = cx - sep, a1y = cy;
+        const a2x = cx + sep, a2y = cy;
+        const range = 100;
+        const d1 = Math.sqrt((mx-a1x)**2 + (my-a1y)**2);
+        const d2 = Math.sqrt((mx-a2x)**2 + (my-a2y)**2);
+        return Math.max(
+          d1 < range ? 1 - d1/range : 0,
+          d2 < range ? 1 - d2/range : 0
+        );
+      },
+
+      figure8(mx, my, t) {
+        // Lemniscate (figure-8) path
+        const cx = W/2, cy = H/2;
+        const a = Math.min(W, H) * 0.28;
+        const ct = Math.cos(t), st = Math.sin(t);
+        const denom = 1 + st * st;
+        const ax = cx + (a * ct) / denom;
+        const ay = cy + (a * ct * st) / denom;
+        const dx = mx - ax, dy = my - ay;
+        const d = Math.sqrt(dx*dx + dy*dy);
+        const range = 90;
+        return d < range ? 1 - d/range : 0;
+      }
+    };
 
     // --- Physics params ---
     const MOUSE_RANGE = 200;
@@ -326,6 +570,10 @@
       vR.textContent     = String(R);
       vMouse.textContent = MOUSE_FORCE.toFixed(2);
       vSep.textContent   = SEP_F.toFixed(2);
+      vMass.textContent  = String(OBJ_MASS);
+      vObjSize.textContent = String(OBJ_SIZE);
+      vDanceStr.textContent = DANCE_STRENGTH.toFixed(2);
+      vDanceTempo.textContent = DANCE_TEMPO.toFixed(1);
     }
     updateLabels();
 
@@ -385,12 +633,20 @@
         }
       }
 
-      // 2) draw electromagnets (behind particles)
+      // 2) dance: compute magnet activation + advance time
+      if (danceActive) danceTime += 0.016 * DANCE_TEMPO;
+      const patternFn = danceActive ? dancePatterns[danceSelect.value] : null;
+
+      // 2b) draw electromagnets (behind particles)
       for (let m = 0; m < magnets.length; m++) {
         const mg = magnets[m];
-        const raw    = Math.max(0, Math.min((mg._c - DENSITY_THRESHOLD) / (DENSITY_MAX - DENSITY_THRESHOLD), 1));
+        // Dance activation (0-1)
+        mg._dance = patternFn ? patternFn(mg.x, mg.y, danceTime) : 0;
+
+        const densityRaw = Math.max(0, Math.min((mg._c - DENSITY_THRESHOLD) / (DENSITY_MAX - DENSITY_THRESHOLD), 1));
+        const raw = Math.max(densityRaw, mg._dance);
         const target = Math.pow(raw, 0.55);
-        mg.brightness += (target - mg.brightness) * 0.08;
+        mg.brightness += (target - mg.brightness) * 0.12;
         const b = mg.brightness;
 
         ctx.beginPath();
@@ -426,6 +682,21 @@
           p.vy += (mdy/md) * f;
         }
 
+        // Dance: electromagnetic field forces from activated magnets
+        if (danceActive) {
+          for (let m = 0; m < magnets.length; m++) {
+            const mg = magnets[m];
+            if (mg._dance < 0.05) continue;
+            const dmx = mg.x - p.x, dmy = mg.y - p.y;
+            const dd = Math.sqrt(dmx*dmx + dmy*dmy);
+            if (dd < 1 || dd > DANCE_MAG_RANGE) continue;
+            const falloff = 1 - dd / DANCE_MAG_RANGE;
+            const ff = mg._dance * DANCE_STRENGTH * falloff * 0.6;
+            p.vx += (dmx/dd) * ff;
+            p.vy += (dmy/dd) * ff;
+          }
+        }
+
         // Swarmalator coupling
         for (let j = i + 1; j < particles.length; j++) {
           const q = particles[j];
@@ -457,8 +728,14 @@
           p.vy = (p.vy / spd) * MAX_SPD;
         }
 
-        p.x = (p.x + p.vx + W) % W;
-        p.y = (p.y + p.vy + H) % H;
+        p.x += p.vx;
+        p.y += p.vy;
+
+        // Closed boundary — reflect off walls
+        if (p.x < p.r)     { p.x = p.r;     p.vx *= -0.5; }
+        if (p.x > W - p.r) { p.x = W - p.r; p.vx *= -0.5; }
+        if (p.y < p.r)     { p.y = p.r;     p.vy *= -0.5; }
+        if (p.y > H - p.r) { p.y = H - p.r; p.vy *= -0.5; }
 
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
@@ -466,7 +743,138 @@
         ctx.fill();
       }
 
-      // 4) Group detection & swarm outline
+      // 4) Rigid body objects — collision with particles + physics + draw
+      for (let oi = 0; oi < objects.length; oi++) {
+        const obj = objects[oi];
+        const cosA = Math.cos(obj.angle), sinA = Math.sin(obj.angle);
+        const hw = obj.w / 2, hh = obj.h / 2;
+
+        // Particle ↔ Object collision
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
+          // Transform particle into object local space
+          const lx = cosA * (p.x - obj.x) + sinA * (p.y - obj.y);
+          const ly = -sinA * (p.x - obj.x) + cosA * (p.y - obj.y);
+
+          // Closest point on box in local space
+          const clx = Math.max(-hw, Math.min(hw, lx));
+          const cly = Math.max(-hh, Math.min(hh, ly));
+
+          const dlx = lx - clx, dly = ly - cly;
+          const dist2 = dlx*dlx + dly*dly;
+          const rr = p.r + 1; // small skin
+
+          if (dist2 < rr * rr && dist2 > 0.01) {
+            const dist = Math.sqrt(dist2);
+            // Normal in local space
+            const nlx = dlx / dist, nly = dly / dist;
+            // Transform normal back to world space
+            const nx = cosA * nlx - sinA * nly;
+            const ny = sinA * nlx + cosA * nly;
+
+            // Contact point in world space
+            const cpx = cosA * clx - sinA * cly + obj.x;
+            const cpy = sinA * clx + cosA * cly + obj.y;
+
+            // Relative velocity at contact
+            const rx = cpx - obj.x, ry = cpy - obj.y;
+            const objVxAtContact = obj.vx - obj.angVel * ry;
+            const objVyAtContact = obj.vy + obj.angVel * rx;
+            const relVx = p.vx - objVxAtContact;
+            const relVy = p.vy - objVyAtContact;
+            const relVn = relVx * nx + relVy * ny;
+
+            if (relVn < 0) { // approaching
+              const rCrossN = rx * ny - ry * nx;
+              const invMassSum = (1 / 0.5) + (1 / obj.mass) + (rCrossN * rCrossN) / obj.inertia;
+              const restitution = 0.3;
+              const j = -(1 + restitution) * relVn / invMassSum;
+
+              // Apply impulse to particle
+              p.vx += j * nx * 2;  // particle is light
+              p.vy += j * ny * 2;
+
+              // Apply impulse to object
+              obj.vx -= (j * nx) / obj.mass;
+              obj.vy -= (j * ny) / obj.mass;
+              obj.angVel -= (j * rCrossN) / obj.inertia;
+            }
+
+            // Separate overlap
+            const overlap = rr - dist;
+            p.x += nx * overlap * 0.7;
+            p.y += ny * overlap * 0.7;
+            obj.x -= nx * overlap * 0.3;
+            obj.y -= ny * overlap * 0.3;
+          }
+        }
+
+        // Object-Object collision (simple AABB push apart)
+        for (let oj = oi + 1; oj < objects.length; oj++) {
+          const ob = objects[oj];
+          const dx = ob.x - obj.x, dy = ob.y - obj.y;
+          const minDist = (obj.w + ob.w) / 2;
+          const d = Math.sqrt(dx*dx + dy*dy);
+          if (d < minDist && d > 0.1) {
+            const nx = dx/d, ny = dy/d;
+            const overlap = minDist - d;
+            obj.x -= nx * overlap * 0.5;
+            obj.y -= ny * overlap * 0.5;
+            ob.x  += nx * overlap * 0.5;
+            ob.y  += ny * overlap * 0.5;
+            // exchange some velocity
+            const relV = (obj.vx - ob.vx)*nx + (obj.vy - ob.vy)*ny;
+            if (relV > 0) {
+              obj.vx -= relV * nx * 0.5;
+              obj.vy -= relV * ny * 0.5;
+              ob.vx  += relV * nx * 0.5;
+              ob.vy  += relV * ny * 0.5;
+            }
+          }
+        }
+
+        // Integrate object
+        obj.vx *= OBJ_DAMP;
+        obj.vy *= OBJ_DAMP;
+        obj.angVel *= OBJ_ANG_DAMP;
+        // Friction (ground drag proportional to mass)
+        const spd = Math.sqrt(obj.vx*obj.vx + obj.vy*obj.vy);
+        if (spd > 0.01) {
+          const fric = Math.min(OBJ_FRICTION / obj.mass, spd);
+          obj.vx -= (obj.vx/spd) * fric;
+          obj.vy -= (obj.vy/spd) * fric;
+        }
+        obj.x += obj.vx;
+        obj.y += obj.vy;
+        obj.angle += obj.angVel;
+
+        // Keep in bounds
+        obj.x = Math.max(hw, Math.min(W - hw, obj.x));
+        obj.y = Math.max(hh, Math.min(H - hh, obj.y));
+
+        // Draw object
+        ctx.save();
+        ctx.translate(obj.x, obj.y);
+        ctx.rotate(obj.angle);
+        ctx.beginPath();
+        ctx.rect(-hw, -hh, obj.w, obj.h);
+        const isDark = html.getAttribute('data-theme') === 'dark';
+        ctx.fillStyle = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+        ctx.fill();
+        ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Mass label
+        ctx.fillStyle = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)';
+        ctx.font = '500 10px system-ui, -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`m=${obj.mass}`, 0, 0);
+        ctx.restore();
+      }
+
+      // 5) Group detection & swarm outline
       const hotMagnets = [];
       for (let m = 0; m < magnets.length; m++) {
         if (magnets[m]._c >= GROUP_THRESHOLD) hotMagnets.push(magnets[m]);
