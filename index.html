@@ -236,9 +236,61 @@
       letter-spacing:0.2px;
     }
 
+    /* Swarmalator metrics panel */
+    .metrics{
+      position:fixed;
+      right:16px; top:50px;
+      z-index:3;
+      width:220px;
+      padding:12px 14px;
+      border-radius:10px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(14px) saturate(1.2);
+      -webkit-backdrop-filter: blur(14px) saturate(1.2);
+      color: var(--panel-text);
+      font: 12px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      user-select:none;
+      transition: background 0.35s ease, border-color 0.35s ease, color 0.35s ease;
+    }
+    .metrics h4{
+      margin:0 0 8px; font-size:11px; font-weight:600;
+      letter-spacing:0.5px; text-transform:uppercase;
+      color: var(--panel-text-mute);
+    }
+    .m-row{
+      display:flex; justify-content:space-between; align-items:center;
+      padding:3px 0;
+    }
+    .m-label{ color: var(--panel-text); font-size:12px; }
+    .m-label i{ font-style:italic; font-family: 'Times New Roman', serif; font-size:13px; }
+    .m-val{
+      font-variant-numeric:tabular-nums;
+      color: var(--panel-text-strong);
+      font-weight:500; font-size:12px;
+      min-width:50px; text-align:right;
+    }
+    .m-sep{ border-top:1px solid var(--panel-border); margin:6px 0; }
+    .m-bar-track{
+      flex:1; height:4px; margin:0 8px;
+      background:rgba(127,127,127,0.15);
+      border-radius:2px; overflow:hidden;
+    }
+    .m-bar-fill{
+      height:100%; border-radius:2px;
+      background: rgba(var(--mag-on), 0.7);
+      transition: width 0.1s;
+    }
+    #mSpeedBar{ opacity: 0.6; }
+    .metrics input[type="range"]{
+      width:100%; accent-color: var(--accent);
+      margin:2px 0 0;
+    }
+    .m-slider{ margin-bottom:4px; }
+
     .game-link{
       position:fixed;
-      bottom:20px; right:20px;
+      bottom:20px; right:16px;
       z-index:4;
       padding:10px 20px;
       border-radius:8px;
@@ -343,6 +395,40 @@
       </div>
     </div>
 
+  </div>
+
+  <div class="metrics" id="metricsPanel">
+    <h4>Swarmalator Coefficients</h4>
+    <div class="m-slider">
+      <div class="m-row"><span class="m-label"><i>J</i> attraction</span><span class="m-val" id="mJ">0.014</span></div>
+      <input id="sAtt" type="range" min="0" max="0.1" step="0.001" value="0.014">
+    </div>
+    <div class="m-slider">
+      <div class="m-row"><span class="m-label"><i>K</i> phase coupling</span><span class="m-val" id="mK">0.0008</span></div>
+      <input id="sPhase" type="range" min="0" max="0.01" step="0.0001" value="0.0008">
+    </div>
+    <div class="m-slider">
+      <div class="m-row"><span class="m-label"><i>σ</i> repulsion</span><span class="m-val" id="mSigma">0.15</span></div>
+      <input id="sSigma" type="range" min="0" max="3.0" step="0.01" value="0.15">
+    </div>
+    <div class="m-slider">
+      <div class="m-row"><span class="m-label"><i>γ</i> damping</span><span class="m-val" id="mGamma">0.96</span></div>
+      <input id="sDamp" type="range" min="0.80" max="1.00" step="0.005" value="0.96">
+    </div>
+    <div class="m-sep"></div>
+    <h4>Order Parameters</h4>
+    <div class="m-row">
+      <span class="m-label"><i>Ψ</i> phase sync</span>
+      <div class="m-bar-track"><div class="m-bar-fill" id="mPsiBar" style="width:0%"></div></div>
+      <span class="m-val" id="mPsi">0.00</span>
+    </div>
+    <div class="m-row">
+      <span class="m-label"><i>v̄</i> avg speed</span>
+      <div class="m-bar-track"><div class="m-bar-fill" id="mSpeedBar" style="width:0%"></div></div>
+      <span class="m-val" id="mSpeed">0.00</span>
+    </div>
+    <div class="m-row"><span class="m-label">Groups</span><span class="m-val" id="mGroups">0</span></div>
+    <div class="m-row"><span class="m-label"><i>N</i> agents</span><span class="m-val" id="mN">0</span></div>
   </div>
 
   <canvas id="particle-canvas"></canvas>
@@ -535,9 +621,16 @@
     let SEP_DIST = MIN_DIST;
     let SEP_F = parseFloat(sSep.value);
 
-    const ATT_F = 0.014;
+    // Swarmalator coefficients (adjustable via right panel)
+    const sAtt    = document.getElementById('sAtt');
+    const sPhase  = document.getElementById('sPhase');
+    const sSigma  = document.getElementById('sSigma');
+    const sDamp   = document.getElementById('sDamp');
+
+    let ATT_F = parseFloat(sAtt.value);
+    let PHASE_K = parseFloat(sPhase.value);
+    let DAMP = parseFloat(sDamp.value);
     const MAX_SPD = 4;
-    const DAMP = 0.96;
 
     window.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
     window.addEventListener('mouseleave', () => { mouseX = -9999; mouseY = -9999; });
@@ -618,6 +711,17 @@
 
     sSep.addEventListener('input', () => {
       SEP_F = parseFloat(sSep.value);
+      sSigma.value = sSep.value; // sync right panel
+      updateLabels();
+    });
+
+    // Right-panel swarmalator coefficient sliders
+    sAtt.addEventListener('input', () => { ATT_F = parseFloat(sAtt.value); });
+    sPhase.addEventListener('input', () => { PHASE_K = parseFloat(sPhase.value); });
+    sDamp.addEventListener('input', () => { DAMP = parseFloat(sDamp.value); });
+    sSigma.addEventListener('input', () => {
+      SEP_F = parseFloat(sSigma.value);
+      sSep.value = sSigma.value; // sync left panel
       updateLabels();
     });
 
@@ -734,7 +838,7 @@
             p.vx += nx * f; p.vy += ny * f;
             q.vx -= nx * f; q.vy -= ny * f;
 
-            const dp = 0.0008 * Math.sin(q.phase - p.phase);
+            const dp = PHASE_K * Math.sin(q.phase - p.phase);
             p.phase += dp; q.phase -= dp;
           }
         }
@@ -979,6 +1083,30 @@
         ctx.textAlign = 'center';
         ctx.fillText('Swarm', topX, topY - 8);
       }
+
+      // ===== Compute & display swarmalator metrics =====
+      // Phase order parameter: Ψ = |1/N Σ e^{iθ_k}|
+      let sumCos = 0, sumSin = 0, sumSpd = 0;
+      const N = particles.length;
+      for (let i = 0; i < N; i++) {
+        const p = particles[i];
+        sumCos += Math.cos(p.phase);
+        sumSin += Math.sin(p.phase);
+        sumSpd += Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+      }
+      const psi = Math.sqrt(sumCos * sumCos + sumSin * sumSin) / N;
+      const avgSpd = sumSpd / N;
+
+      document.getElementById('mJ').textContent = ATT_F.toFixed(4);
+      document.getElementById('mK').textContent = PHASE_K.toFixed(4);
+      document.getElementById('mSigma').textContent = SEP_F.toFixed(3);
+      document.getElementById('mGamma').textContent = DAMP.toFixed(3);
+      document.getElementById('mPsi').textContent = psi.toFixed(3);
+      document.getElementById('mPsiBar').style.width = (psi * 100) + '%';
+      document.getElementById('mSpeed').textContent = avgSpd.toFixed(2);
+      document.getElementById('mSpeedBar').style.width = Math.min(avgSpd / MAX_SPD * 100, 100) + '%';
+      document.getElementById('mGroups').textContent = String(clusters.length);
+      document.getElementById('mN').textContent = String(N);
 
       requestAnimationFrame(drawFrame);
     }
