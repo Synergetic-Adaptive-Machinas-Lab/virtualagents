@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Background animation</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    /* ===== Theme variables ===== */
+    :root{
+      --bg: #f0f0ef;
+      --grain-opacity: 0.035;
+
+      --panel-bg: rgba(255,255,255,0.55);
+      --panel-border: rgba(255,255,255,0.75);
+      --panel-text: rgba(0,0,0,0.80);
+      --panel-text-strong: rgba(0,0,0,0.92);
+      --panel-text-mute: rgba(0,0,0,0.55);
+
+      --accent: #1a6fb5;
+
+      /* canvas colors (as rgb triples) */
+      --particle-color: 60, 60, 60;
+      --mag-off: 165,163,158;
+      --mag-on: 30,100,255;
+    }
+
+    [data-theme="dark"]{
+      --bg: #0a0a0a;
+      --grain-opacity: 0.035;
+
+      --panel-bg: rgba(18,18,18,0.55);
+      --panel-border: rgba(255,255,255,0.10);
+      --panel-text: rgba(255,255,255,0.82);
+      --panel-text-strong: rgba(255,255,255,0.92);
+      --panel-text-mute: rgba(255,255,255,0.55);
+
+      --accent: #66b6ff;
+
+      --particle-color: 160, 160, 160;
+      --mag-off: 55,55,60;
+      --mag-on: 80,200,255;
+    }
+
+    html, body {
+      margin: 0; padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      transition: background 0.35s ease;
+    }
+
+    /* Grain overlay */
+    body::before{
+      content:'';
+      position:fixed; inset:0;
+      pointer-events:none;
+      opacity: var(--grain-opacity);
+      z-index:2;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      background-size:180px 180px;
+    }
+
+    /* Fullscreen canvas */
+    #particle-canvas{
+      position:fixed; inset:0;
+      width:100vw; height:100vh;
+      z-index:1;
+      display:block;
+    }
+
+    /* ===== Theme toggle ===== */
+    .theme-toggle{
+      position: fixed;
+      top: 16px; right: 16px;
+      z-index: 4;
+      display:flex;
+      align-items:center;
+      gap: 8px;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      user-select:none;
+    }
+    .toggle-icon{
+      font-size: 0.95rem;
+      color: var(--panel-text-mute);
+    }
+    .toggle-track{
+      width: 40px; height: 22px;
+      background: rgba(127,127,127,0.35);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 11px;
+      position: relative;
+      backdrop-filter: blur(10px);
+    }
+    .toggle-knob{
+      position:absolute;
+      top: 3px; left: 3px;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.85);
+      transition: transform 0.25s ease, background 0.25s ease;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    }
+    [data-theme="dark"] .toggle-knob{
+      transform: translateX(18px);
+      background: rgba(10,10,10,0.9);
+    }
+
+    /* Left control panel */
+    .panel{
+      position:fixed;
+      left:16px; top:16px;
+      z-index:3;
+      width:260px;
+      padding:14px 14px 12px;
+      border-radius:12px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(14px) saturate(1.2);
+      -webkit-backdrop-filter: blur(14px) saturate(1.2);
+      color: var(--panel-text);
+      font: 13px/1.35 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      user-select:none;
+      transition: background 0.35s ease, border-color 0.35s ease, color 0.35s ease;
+    }
+    .panel h3{
+      margin:0 0 10px 0;
+      font-size:13px;
+      font-weight:600;
+      letter-spacing:0.2px;
+      color: var(--panel-text-strong);
+      transition: color 0.35s ease;
+    }
+    .row{ margin: 10px 0; }
+    .label{
+      display:flex;
+      justify-content:space-between;
+      align-items:baseline;
+      gap:10px;
+      margin-bottom:6px;
+      color: var(--panel-text);
+      transition: color 0.35s ease;
+    }
+    .label .v{
+      color: var(--panel-text-strong);
+      font-variant-numeric: tabular-nums;
+      transition: color 0.35s ease;
+    }
+    input[type="range"]{
+      width:100%;
+      accent-color: var(--accent);
+    }
+    .hint{
+      margin-top:10px;
+      color: var(--panel-text-mute);
+      font-size:12px;
+      transition: color 0.35s ease;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Theme toggle -->
+  <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+    <span class="toggle-icon" id="toggle-label">🌙</span>
+    <div class="toggle-track"><div class="toggle-knob"></div></div>
+  </button>
+
+  <div class="panel">
+    <h3>Controls</h3>
+
+    <div class="row">
+      <div class="label">
+        <span>number of agents</span>
+        <span class="v" id="vCount"></span>
+      </div>
+      <input id="sCount" type="range" min="50" max="3000" step="50" value="400">
+    </div>
+
+    <div class="row">
+      <div class="label">
+        <span>agent diameter (mm)</span>
+        <span class="v" id="vR"></span>
+      </div>
+      <input id="sR" type="range" min="1" max="8" step="1" value="3">
+    </div>
+
+    <div class="row">
+      <div class="label">
+        <span>mouse force</span>
+        <span class="v" id="vMouse"></span>
+      </div>
+      <input id="sMouse" type="range" min="0" max="2.0" step="0.01" value="0.25">
+    </div>
+
+    <div class="row">
+      <div class="label">
+        <span>repulsion coefficient</span>
+        <span class="v" id="vSep"></span>
+      </div>
+      <input id="sSep" type="range" min="0" max="3.0" step="0.01" value="0.15">
+    </div>
+
+    <div class="hint">DH Han, SAM Lab</div>
+  </div>
+
+  <canvas id="particle-canvas"></canvas>
+
+  <script>
+    /* ===== Theme persistence ===== */
+    const html  = document.documentElement;
+    const label = document.getElementById('toggle-label');
+    const saved = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const initial = saved || (prefersDark ? 'dark' : 'light');
+    html.setAttribute('data-theme', initial);
+    label.textContent = initial === 'dark' ? '🌙' : '☀️';
+
+    function toggleTheme(){
+      const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      label.textContent = next === 'dark' ? '🌙' : '☀️';
+      localStorage.setItem('theme', next);
+    }
+
+    /* ===== Canvas + sim ===== */
+    const canvas = document.getElementById('particle-canvas');
+    const ctx    = canvas.getContext('2d');
+
+    // UI elements
+    const sCount = document.getElementById('sCount');
+    const sR     = document.getElementById('sR');
+    const sMouse = document.getElementById('sMouse');
+    const sSep   = document.getElementById('sSep');
+
+    const vCount = document.getElementById('vCount');
+    const vR     = document.getElementById('vR');
+    const vMouse = document.getElementById('vMouse');
+    const vSep   = document.getElementById('vSep');
+
+    // State
+    let W, H, mouseX = -9999, mouseY = -9999;
+    let particles = [];
+
+    // --- Electromagnet grid params ---
+    const MAG_SX    = 88;
+    const MAG_SY    = 68;
+    const MAG_R     = 20;
+    const DETECT_R  = 62;
+    const DETECT_R2 = DETECT_R * DETECT_R;
+    const DENSITY_MAX = 14;
+    const DENSITY_THRESHOLD = 5;
+    let magnets = [];
+
+    // --- Physics params ---
+    const MOUSE_RANGE = 200;
+    let MOUSE_FORCE = parseFloat(sMouse.value);
+
+    let R = parseInt(sR.value, 10);          // particle radius (px)
+    let COUNT = parseInt(sCount.value, 10);  // number of agents
+
+    let MIN_GAP  = R * 12;
+    let MIN_DIST = R * 2 + MIN_GAP;
+
+    const ATT_DIST = 50;
+    let SEP_DIST = MIN_DIST;
+    let SEP_F = parseFloat(sSep.value);
+
+    const ATT_F = 0.014;
+    const MAX_SPD = 4;
+    const DAMP = 0.96;
+
+    window.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
+    window.addEventListener('mouseleave', () => { mouseX = -9999; mouseY = -9999; });
+
+    function buildMagnets() {
+      magnets = [];
+      const cols = Math.ceil(W / MAG_SX) + 2;
+      const rows = Math.ceil(H / MAG_SY) + 2;
+      for (let row = -1; row <= rows; row++) {
+        const offset = (((row % 2) + 2) % 2 === 1) ? MAG_SX / 2 : 0;
+        for (let col = -1; col <= cols; col++) {
+          magnets.push({ x: col * MAG_SX + offset, y: row * MAG_SY, brightness: 0, _c: 0 });
+        }
+      }
+    }
+
+    function resize() {
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      W = Math.floor(window.innerWidth);
+      H = Math.floor(window.innerHeight);
+
+      canvas.width  = Math.floor(W * dpr);
+      canvas.height = Math.floor(H * dpr);
+      canvas.style.width  = W + "px";
+      canvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      buildMagnets();
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function reseedParticles() {
+      particles = [];
+      for (let i = 0; i < COUNT; i++) {
+        particles.push({
+          x: Math.random() * W, y: Math.random() * H,
+          vx: (Math.random()-0.5)*1.2, vy: (Math.random()-0.5)*1.2,
+          phase: Math.random() * Math.PI * 2,
+          r: R
+        });
+      }
+    }
+    reseedParticles();
+
+    // ---- UI wiring ----
+    function updateLabels() {
+      vCount.textContent = String(COUNT);
+      vR.textContent     = String(R);
+      vMouse.textContent = MOUSE_FORCE.toFixed(2);
+      vSep.textContent   = SEP_F.toFixed(2);
+    }
+    updateLabels();
+
+    sCount.addEventListener('input', () => {
+      COUNT = parseInt(sCount.value, 10);
+      reseedParticles();
+      updateLabels();
+    });
+
+    sR.addEventListener('input', () => {
+      R = parseInt(sR.value, 10);
+      MIN_GAP  = R * 12;
+      MIN_DIST = R * 2 + MIN_GAP;
+      SEP_DIST = MIN_DIST;
+      reseedParticles();
+      updateLabels();
+    });
+
+    sMouse.addEventListener('input', () => {
+      MOUSE_FORCE = parseFloat(sMouse.value);
+      updateLabels();
+    });
+
+    sSep.addEventListener('input', () => {
+      SEP_F = parseFloat(sSep.value);
+      updateLabels();
+    });
+
+    // ===== Theme-aware colors for canvas (cached) =====
+    let colorCache = null, lastTheme = '';
+    function getColors(){
+      const theme = html.getAttribute('data-theme');
+      if (theme === lastTheme && colorCache) return colorCache;
+      lastTheme = theme;
+
+      const style = getComputedStyle(html);
+      colorCache = {
+        particle: style.getPropertyValue('--particle-color').trim(),
+        magOff:   style.getPropertyValue('--mag-off').trim(),
+        magOn:    style.getPropertyValue('--mag-on').trim(),
+      };
+      return colorCache;
+    }
+
+    function drawFrame() {
+      ctx.clearRect(0, 0, W, H);
+      const C = getColors();
+
+      // 1) density from particles -> magnets
+      for (let m = 0; m < magnets.length; m++) magnets[m]._c = 0;
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        for (let m = 0; m < magnets.length; m++) {
+          const mg = magnets[m];
+          const dx = p.x - mg.x, dy = p.y - mg.y;
+          if (dx*dx + dy*dy < DETECT_R2) mg._c++;
+        }
+      }
+
+      // 2) draw electromagnets (behind particles)
+      for (let m = 0; m < magnets.length; m++) {
+        const mg = magnets[m];
+        const raw    = Math.max(0, Math.min((mg._c - DENSITY_THRESHOLD) / (DENSITY_MAX - DENSITY_THRESHOLD), 1));
+        const target = Math.pow(raw, 0.55);
+        mg.brightness += (target - mg.brightness) * 0.08;
+        const b = mg.brightness;
+
+        ctx.beginPath();
+        ctx.arc(mg.x, mg.y, MAG_R, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(${C.magOff},${0.10 + b * 0.08})`;
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        if (b > 0.015) {
+          const grad = ctx.createRadialGradient(mg.x, mg.y, 0, mg.x, mg.y, MAG_R * (1 + b * 0.6));
+          grad.addColorStop(0,    `rgba(${C.magOn},${b * 0.92})`);
+          grad.addColorStop(0.45, `rgba(${C.magOn},${b * 0.55})`);
+          grad.addColorStop(0.8,  `rgba(${C.magOn},${b * 0.18})`);
+          grad.addColorStop(1,    `rgba(${C.magOn},0)`);
+
+          ctx.beginPath();
+          ctx.arc(mg.x, mg.y, MAG_R * (1 + b * 0.6), 0, Math.PI * 2);
+          ctx.fillStyle = grad;
+          ctx.fill();
+        }
+      }
+
+      // 3) particle physics + draw
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+
+        // Mouse attraction
+        const mdx = mouseX - p.x, mdy = mouseY - p.y;
+        const md  = Math.sqrt(mdx*mdx + mdy*mdy);
+        if (md < MOUSE_RANGE && md > 1) {
+          const f = MOUSE_FORCE * (1 - md / MOUSE_RANGE);
+          p.vx += (mdx/md) * f;
+          p.vy += (mdy/md) * f;
+        }
+
+        // Swarmalator coupling
+        for (let j = i + 1; j < particles.length; j++) {
+          const q = particles[j];
+          const dx = q.x - p.x, dy = q.y - p.y;
+          const d  = Math.sqrt(dx*dx + dy*dy);
+          if (d < 1 || d > ATT_DIST) continue;
+
+          const nx = dx / d, ny = dy / d;
+          if (d < SEP_DIST) {
+            const f = SEP_F * (1 - d / SEP_DIST);
+            p.vx -= nx * f; p.vy -= ny * f;
+            q.vx += nx * f; q.vy += ny * f;
+          } else {
+            const sync = (1 + Math.cos(q.phase - p.phase)) * 0.5;
+            const f = ATT_F * sync;
+            p.vx += nx * f; p.vy += ny * f;
+            q.vx -= nx * f; q.vy -= ny * f;
+
+            const dp = 0.0008 * Math.sin(q.phase - p.phase);
+            p.phase += dp; q.phase -= dp;
+          }
+        }
+
+        p.vx *= DAMP; p.vy *= DAMP;
+
+        const spd = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
+        if (spd > MAX_SPD) {
+          p.vx = (p.vx / spd) * MAX_SPD;
+          p.vy = (p.vy / spd) * MAX_SPD;
+        }
+
+        p.x = (p.x + p.vx + W) % W;
+        p.y = (p.y + p.vy + H) % H;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${C.particle},0.65)`;
+        ctx.fill();
+      }
+
+      requestAnimationFrame(drawFrame);
+    }
+
+    drawFrame();
+  </script>
+</body>
+</html>
